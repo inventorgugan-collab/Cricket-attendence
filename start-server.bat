@@ -68,7 +68,13 @@ echo  The server is running.
 echo  On the phone, tap "Server" on the sign-in screen and enter
 echo  this computer's address (the phone must use the same Wi-Fi):
 echo.
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do echo     %%a
+rem Only the adapter with a router (Wi-Fi or cable); virtual ones have none.
+set FOUND=
+for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "(Get-NetIPConfiguration | Where-Object IPv4DefaultGateway).IPv4Address.IPAddress" 2^>nul`) do (
+  echo     %%a
+  set FOUND=1
+)
+if not defined FOUND for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do echo     %%a
 echo.
 echo  For test logins, run add-demo-academy.bat.
 echo  To stop the server later, run stop-server.bat.
