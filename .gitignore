@@ -9,3 +9,4 @@ mobile/android/local.properties
 mobile/ios/Flutter/Generated.xcconfig
 mobile/ios/Pods/
 .academy-created
+.demo-created
