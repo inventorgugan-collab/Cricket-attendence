@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api.dart';
 import '../../core/app_state.dart';
+import '../../core/config.dart';
 import '../../ui/theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -84,6 +85,39 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _changeServer() async {
+    final api = context.read<ApiClient>();
+    final field = TextEditingController(text: api.baseUrl);
+    final url = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Server address'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('For a trial on your own computer, enter its Wi-Fi address, for example 192.168.1.5. The phone must be on the same Wi-Fi.'),
+          const SizedBox(height: 14),
+          TextField(
+            controller: field,
+            autofocus: true,
+            autocorrect: false,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(labelText: 'Address'),
+            onSubmitted: (v) => Navigator.pop(context, v),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, field.text), child: const Text('Save')),
+        ],
+      ),
+    );
+    final server = url == null ? '' : AppConfig.normaliseServer(url);
+    if (server.isEmpty || !mounted) return;
+    api.baseUrl = server;
+    await api.tokens.setServer(server);
+    setState(() => _error = null);
+    if (_code.isNotEmpty) _check(_code);
   }
 
   @override
@@ -182,6 +216,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 20),
                           Text('Accounts are created by the academy. Ask the admin if you need one.',
                               textAlign: TextAlign.center, style: text.bodySmall),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: _changeServer,
+                            icon: const Icon(Icons.dns_outlined, size: 18),
+                            label: Text('Server: ${Uri.tryParse(context.read<ApiClient>().baseUrl)?.authority ?? ''}'),
+                          ),
                         ]),
                       ),
                     ),

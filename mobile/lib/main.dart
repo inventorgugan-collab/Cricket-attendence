@@ -18,7 +18,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // On the web, expose the accessibility tree so screen readers and browser automation work.
   if (kIsWeb) SemanticsBinding.instance.ensureSemantics();
-  final api = ApiClient(baseUrl: AppConfig.apiBaseUrl, tokens: SecureTokenStore());
+  final tokens = SecureTokenStore();
+  final api = ApiClient(baseUrl: await tokens.server() ?? AppConfig.apiBaseUrl, tokens: tokens);
   final local = await LocalDb.openEncrypted();
   final sync = SyncService(api, local);
   final app = AppState(api, local, sync);

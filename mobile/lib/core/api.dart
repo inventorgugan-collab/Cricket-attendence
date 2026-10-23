@@ -26,7 +26,8 @@ class OfflineException implements Exception {
 class ApiClient {
   ApiClient({required this.baseUrl, required this.tokens, http.Client? client}) : _http = client ?? http.Client();
 
-  final String baseUrl;
+  /// Can be changed on the sign-in screen, e.g. to a computer on the same Wi-Fi.
+  String baseUrl;
   final TokenStore tokens;
   final http.Client _http;
 

@@ -16,6 +16,10 @@ abstract class TokenStore {
 
   /// The academy code last signed in to on this phone, kept after sign-out.
   Future<String?> lastAcademy();
+
+  /// The server address chosen on this phone, if it differs from the built-in one.
+  Future<String?> server();
+  Future<void> setServer(String url);
 }
 
 /// Keychain on iOS, Keystore-backed encrypted storage on Android.
@@ -48,6 +52,12 @@ class SecureTokenStore implements TokenStore {
 
   @override
   Future<String?> lastAcademy() => _storage.read(key: 'academy');
+
+  @override
+  Future<String?> server() => _storage.read(key: 'server');
+
+  @override
+  Future<void> setServer(String url) => _storage.write(key: 'server', value: url);
 }
 
 class MemoryTokenStore implements TokenStore {
@@ -64,4 +74,9 @@ class MemoryTokenStore implements TokenStore {
   String? _academy;
   @override
   Future<String?> lastAcademy() async => _academy ?? _tokens?.academy;
+  String? _server;
+  @override
+  Future<String?> server() async => _server;
+  @override
+  Future<void> setServer(String url) async => _server = url;
 }

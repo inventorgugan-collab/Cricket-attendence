@@ -1,0 +1,32 @@
+# Runs the server and its database on one computer, for a trial on phones
+# connected to the same Wi-Fi. On Windows, double-click start-server.bat.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: cpl
+      POSTGRES_PASSWORD: cpl
+      POSTGRES_DB: cpl
+    volumes:
+      - cpl-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "cpl"]
+      interval: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgres://cpl:cpl@db/cpl
+      JWT_SECRET: ${JWT_SECRET:?run start-server.bat, which creates .env}
+      MESSAGING_KEY: ${MESSAGING_KEY:?run start-server.bat, which creates .env}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  cpl-data:

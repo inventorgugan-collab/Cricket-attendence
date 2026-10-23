@@ -35,6 +35,20 @@ mobile/    Flutter app for Android and iOS
 | WhatsApp | Done, in preview until connected. Official WhatsApp Business Platform (Cloud API) template messages to people who agreed; coaches' evening summary (leave, cover, sessions still needing a coach, tomorrow's count) to a group if the account may post to groups, otherwise to each coach. |
 | Mobile app | New design throughout. Academy code at sign-in; Money tab and fees on each player; WhatsApp setup, consent and message log. Coach register and notes (offline), leave and requests; player and parent home, booking a time, journal, packages; admin cover, approvals, setup (categories, coach order, package designs, leave), conflicts, registration. |
 
+## Trial on your own computer
+
+For a trial without a hosted server, run the server on a Windows computer and
+point the phones at it over the same Wi-Fi.
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and start it.
+2. Download this repository (Code → Download ZIP) and extract it.
+3. Double-click `start-server.bat`. The first run takes a few minutes, then asks
+   for the academy code, name, admin login and password, and prints this
+   computer's address. Allow it through Windows Firewall if asked.
+4. In the app, tap **Server** on the sign-in screen and enter that address.
+
+`stop-server.bat` stops it; the data is kept for next time.
+
 ## Running the backend
 
 Needs Node 22+ and PostgreSQL 14+ (with the `btree_gist` and `pgcrypto` extensions).
