@@ -49,6 +49,7 @@ point the phones at it over the same Wi-Fi.
 
 `add-demo-academy.bat` adds a test academy (code `test`, password `demo1234` for
 the logins admin, arun, bala, ravi, karthik and lakshmi) with sample data.
+If the phone can't connect, run `allow-phone-access.bat` to open port 3000 in Windows Firewall.
 `stop-server.bat` stops it; the data is kept for next time.
 
 ## Running the backend
