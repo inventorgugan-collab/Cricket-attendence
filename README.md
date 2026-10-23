@@ -47,7 +47,7 @@ point the phones at it over the same Wi-Fi.
    computer's address. Allow it through Windows Firewall if asked.
 4. In the app, tap **Server** on the sign-in screen and enter that address.
 
-`add-demo-academy.bat` adds a demo academy (code `demo`, password `demo1234` for
+`add-demo-academy.bat` adds a test academy (code `test`, password `demo1234` for
 the logins admin, arun, bala, ravi, karthik and lakshmi) with sample data.
 `stop-server.bat` stops it; the data is kept for next time.
 

@@ -1,5 +1,5 @@
 @echo off
-rem Adds a demo academy (code "demo") with test logins and sample data, for
+rem Adds a demo academy (code "test") with test logins and sample data, for
 rem trying the app. Run start-server.bat first. Your own academy is not touched.
 cd /d "%~dp0"
 
@@ -14,7 +14,7 @@ if exist .demo-created (
   goto show
 )
 
-docker compose exec -T -e NODE_ENV=development -e SEED_ACADEMY=demo -e "SEED_ACADEMY_NAME=Demo Cricket Academy" -e SEED_PASSWORD=demo1234 api npx tsx src/seed.ts
+docker compose exec -T -e NODE_ENV=development -e SEED_ACADEMY=test -e "SEED_ACADEMY_NAME=Test Cricket Academy" -e SEED_PASSWORD=demo1234 api npx tsx src/seed.ts
 if errorlevel 1 (
   echo Could not add the demo academy. Send the messages above to Claude.
   pause
@@ -25,7 +25,7 @@ echo done> .demo-created
 :show
 echo.
 echo ============================================================
-echo  Demo academy code: demo        Password for all: demo1234
+echo  Test academy code: test        Password for all: demo1234
 echo.
 echo    admin     the academy admin
 echo    arun      coach
