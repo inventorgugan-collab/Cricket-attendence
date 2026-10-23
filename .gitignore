@@ -1,0 +1,10 @@
+node_modules/
+.env
+*.log
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+mobile/android/local.properties
+mobile/ios/Flutter/Generated.xcconfig
+mobile/ios/Pods/

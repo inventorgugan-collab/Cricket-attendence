@@ -1,0 +1,34 @@
+# Builds the iPhone app and sends it to TestFlight, without needing a Mac.
+# Needs, in Codemagic: an App Store Connect API key integration named
+# "cpl_app_store", and an environment group "cpl" with API_BASE_URL.
+workflows:
+  ios-testflight:
+    name: iOS to TestFlight
+    working_directory: mobile
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: cpl_app_store
+    environment:
+      groups: [cpl]
+      flutter: stable
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.cricketperformancelab.cplMobile
+    scripts:
+      - name: Get packages
+        script: flutter pub get
+      - name: Set up signing
+        script: xcode-project use-profiles
+      - name: Build
+        script: |
+          flutter build ipa --release \
+            --build-number=$(($(date +%s) / 60)) \
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

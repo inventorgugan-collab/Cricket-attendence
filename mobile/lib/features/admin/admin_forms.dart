@@ -123,7 +123,7 @@ class AdminPlayerScreen extends StatelessWidget {
               OutlinedButton.icon(
                 icon: const Icon(Icons.key),
                 label: const Text('Create player login'),
-                onPressed: () => _createLogin(context, role: 'player', profileId: playerId, name: p['full_name'] as String, reload: reload),
+                onPressed: () => createLogin(context, role: 'player', profileId: playerId, name: p['full_name'] as String, reload: reload),
               ),
             const Divider(height: 32),
             Text('Parents and guardians', style: Theme.of(context).textTheme.titleMedium),
@@ -214,7 +214,7 @@ class AdminPlayerScreen extends StatelessWidget {
       final g = await api.post('/v1/guardians', {'full_name': name.text.trim(), 'phone': phone.text.trim()}) as Map<String, dynamic>;
       await api.post('/v1/players/$playerId/guardians', {'guardianId': g['id'], 'relationship': relationship.text.trim(), 'isPrimary': true});
       if (context.mounted && phone.text.trim().isNotEmpty) {
-        await _createLogin(context, role: 'guardian', profileId: g['id'] as String, name: name.text.trim(), reload: reload, suggestedLogin: phone.text.trim());
+        await createLogin(context, role: 'guardian', profileId: g['id'] as String, name: name.text.trim(), reload: reload, suggestedLogin: phone.text.trim());
       }
       await reload();
     } catch (e) {
@@ -223,7 +223,8 @@ class AdminPlayerScreen extends StatelessWidget {
   }
 }
 
-Future<void> _createLogin(BuildContext context,
+/// Give a player, parent or coach a login with a temporary password.
+Future<void> createLogin(BuildContext context,
     {required String role, required String profileId, required String name, required Future<void> Function() reload, String? suggestedLogin}) async {
   final login = TextEditingController(text: suggestedLogin);
   final password = TextEditingController();

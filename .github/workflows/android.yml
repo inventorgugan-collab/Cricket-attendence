@@ -1,0 +1,44 @@
+# Builds an installable Android app (APK) for trial use and attaches it to the
+# "android-trial" release, so it can be downloaded straight onto a phone.
+# The server address comes from the repository variable API_BASE_URL
+# (Settings → Secrets and variables → Actions → Variables), else SERVER below.
+name: Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [mobile/**]
+env:
+  SERVER: ""
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || env.SERVER }}
+      - run: cp build/app/outputs/flutter-apk/app-release.apk build/cricket-lab.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cricket-performance-lab-apk
+          path: mobile/build/cricket-lab.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-trial
+          name: Android trial build
+          prerelease: true
+          files: mobile/build/cricket-lab.apk
+          body: Open this page on an Android phone and tap cricket-lab.apk to download and install it.

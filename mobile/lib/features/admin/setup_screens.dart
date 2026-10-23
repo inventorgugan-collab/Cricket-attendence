@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api.dart';
 import '../coach/leave_screen.dart';
+import 'admin_forms.dart' show createLogin;
 import 'admin_home.dart' show ConflictsScreen;
 import 'money_screens.dart';
 import 'whatsapp_screen.dart';
@@ -23,6 +24,7 @@ class SetupScreen extends StatelessWidget {
       body: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
         const SectionHeader('Coaching', padding: EdgeInsets.fromLTRB(16, 4, 16, 6)),
         GroupCard(children: [
+          MenuTile(icon: Icons.sports_outlined, title: 'Coaches', subtitle: 'Add coaches and give them a login', onTap: () => open(const CoachesScreen())),
           MenuTile(
             icon: Icons.format_list_numbered,
             title: 'Kinds of session and coach order',
@@ -382,5 +384,81 @@ class ReassignCoachScreen extends StatelessWidget {
     if (c['busy'] == true) return 'Teaching another session';
     if (c['outside_hours'] == true) return 'Free, but outside their usual hours';
     return c['priority'] == null ? 'Free (not in this session type\'s coach list)' : 'Free';
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/// The academy's coaches: add one, give them a login, see who can sign in.
+class CoachesScreen extends StatelessWidget {
+  const CoachesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final api = context.read<ApiClient>();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Coaches')),
+      body: OnlineLoader<List<dynamic>>(
+        load: () async => await api.get('/v1/coaches') as List<dynamic>,
+        builder: (context, coaches, reload) {
+          if (coaches.isEmpty) return const EmptyState('No coaches yet. Add your first coach.', icon: Icons.sports_outlined);
+          return ListView(padding: const EdgeInsets.fromLTRB(0, 4, 0, 96), children: [
+            GroupCard(children: [
+              for (final c in coaches.cast<Map<String, dynamic>>())
+                ListTile(
+                  leading: Avatar(c['full_name'] as String),
+                  title: Text(c['full_name'] as String),
+                  subtitle: Text([if (c['phone'] != null) c['phone'] as String, c['user_id'] == null ? 'No login yet' : 'Can sign in'].join(' · ')),
+                  trailing: c['user_id'] == null
+                      ? TextButton(
+                          onPressed: () => createLogin(context,
+                              role: 'coach', profileId: c['id'] as String, name: c['full_name'] as String, reload: reload, suggestedLogin: c['phone'] as String?),
+                          child: const Text('Create login'),
+                        )
+                      : null,
+                ),
+            ]),
+          ]);
+        },
+      ),
+      floatingActionButton: Builder(
+        builder: (context) => FloatingActionButton.extended(
+          icon: const Icon(Icons.person_add),
+          label: const Text('Add coach'),
+          onPressed: () => _add(context),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _add(BuildContext context) async {
+    final name = TextEditingController();
+    final phone = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add coach'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: name, autofocus: true, decoration: const InputDecoration(labelText: 'Full name')),
+          const SizedBox(height: 8),
+          TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mobile number')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Add')),
+        ],
+      ),
+    );
+    if (ok != true || name.text.trim().isEmpty || !context.mounted) return;
+    try {
+      final c = await context.read<ApiClient>().post('/v1/coaches', {'full_name': name.text.trim(), if (phone.text.trim().isNotEmpty) 'phone': phone.text.trim()}) as Map<String, dynamic>;
+      if (!context.mounted) return;
+      // Straight on to the login, which is what the admin almost always wants next.
+      await createLogin(context, role: 'coach', profileId: c['id'] as String, name: c['full_name'] as String, reload: () async {
+        await Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const CoachesScreen()));
+      }, suggestedLogin: phone.text.trim());
+    } catch (e) {
+      if (context.mounted) showMessage(context, e);
+    }
   }
 }
