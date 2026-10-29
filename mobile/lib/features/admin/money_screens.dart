@@ -13,7 +13,7 @@ import '../common/widgets.dart';
 // synced to their phones.
 
 const methods = ['cash', 'upi', 'bank', 'card', 'cheque', 'other'];
-const expenseCategories = ['ground', 'equipment', 'travel', 'staff', 'utilities', 'other'];
+const expenseCategories = ['rent', 'ground', 'equipment', 'travel', 'staff', 'utilities', 'other'];
 
 String methodLabel(String m) => switch (m) { 'upi' => 'UPI', 'bank' => 'Bank transfer', _ => humanise(m) };
 String monthLabel(String m) => DateFormat('MMMM yyyy').format(DateTime.parse('$m-01'));
@@ -74,6 +74,7 @@ class _MonthView extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final money = m['money'] as Map<String, dynamic>;
     final sessions = m['sessions'] as Map<String, dynamic>;
+    final free = (sessions['free'] as Map?)?.cast<String, dynamic>() ?? const {'sessions': 0, 'attendances': 0, 'players': 0};
     final coaches = (m['coaches'] as List).cast<Map<String, dynamic>>();
     final profit = money['profit_paise'] as num;
     Future<void> then(Future<Object?> f) async {
@@ -128,7 +129,18 @@ class _MonthView extends StatelessWidget {
         StatTile(label: 'Player attendances', value: '${sessions['player_attendances']}', icon: Icons.groups_outlined),
         StatTile(label: 'One-on-one and pairs', value: '${sessions['individual_sessions']}', icon: Icons.person_outline, tone: 'accent'),
         StatTile(label: 'Group', value: '${sessions['group_sessions']}', icon: Icons.diversity_3, tone: 'accent'),
+        StatTile(label: 'Hours coached', value: _hours(sessions['hours'] as num), icon: Icons.schedule),
+        StatTile(label: 'Free sessions', value: '${free['sessions']}', icon: Icons.volunteer_activism_outlined, tone: 'accent'),
       ]),
+      if ((free['players'] as num) > 0 || (free['attendances'] as num) > 0)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Text(
+            '${free['attendances']} attendance${free['attendances'] == 1 ? '' : 's'} by players coached for free '
+            '(${free['players']} player${free['players'] == 1 ? '' : 's'}). A free session is one where everyone who came was free.',
+            style: text.bodySmall,
+          ),
+        ),
       if ((sessions['byCategory'] as List).isNotEmpty)
         GroupCard(margin: const EdgeInsets.fromLTRB(12, 8, 12, 0), children: [
           for (final c in (sessions['byCategory'] as List).cast<Map<String, dynamic>>())
@@ -143,8 +155,8 @@ class _MonthView extends StatelessWidget {
             leading: Avatar(c['full_name'] as String),
             title: Text(c['full_name'] as String),
             subtitle: Text(c['missing_rate'] == true
-                ? '${c['sessions']} sessions · set a pay rate to work out pay'
-                : '${c['sessions']} sessions · earned ${formatRupees(c['earned_paise'] as num)} · paid ${formatRupees(c['paid_paise'] as num)}'),
+                ? '${c['sessions']} sessions · ${_hours(c['hours'] as num)} h · set a pay rate to work out pay'
+                : '${c['sessions']} sessions · ${_hours(c['hours'] as num)} h · earned ${formatRupees(c['earned_paise'] as num)} · paid ${formatRupees(c['paid_paise'] as num)}'),
             trailing: (c['owed_paise'] as num) > 0
                 ? Pill.tone(context, '${formatRupees(c['owed_paise'] as num)} due', 'warn')
                 : (c['sessions'] as num) > 0 && c['missing_rate'] != true
@@ -673,6 +685,67 @@ class FeeTile extends StatelessWidget {
 }
 
 /// Fees for one player, shown on the admin's player page.
+String _hours(num h) => h == h.roundToDouble() ? '${h.round()}' : h.toStringAsFixed(1);
+
+/// Whether the academy coaches this player for free. Their sessions still count
+/// in the month report, but no fees are expected from them.
+class FreeCoachingTile extends StatefulWidget {
+  const FreeCoachingTile({super.key, required this.playerId, required this.free, this.reason});
+  final String playerId;
+  final bool free;
+  final String? reason;
+  @override
+  State<FreeCoachingTile> createState() => _FreeCoachingTileState();
+}
+
+class _FreeCoachingTileState extends State<FreeCoachingTile> {
+  late bool _free = widget.free;
+  late String? _reason = widget.reason;
+  bool _busy = false;
+
+  Future<void> _set(bool free) async {
+    String? reason;
+    if (free) {
+      final field = TextEditingController();
+      reason = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Coach for free'),
+          content: TextField(controller: field, autofocus: true, decoration: const InputDecoration(labelText: 'Why (optional)', hintText: 'e.g. Scholarship')),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(context, field.text.trim()), child: const Text('Save')),
+          ],
+        ),
+      );
+      if (reason == null || !mounted) return;
+    }
+    setState(() => _busy = true);
+    try {
+      final r = await context.read<ApiClient>().put('/v1/players/${widget.playerId}/free-coaching', {'free': free, 'reason': (reason ?? '').isEmpty ? null : reason});
+      setState(() {
+        _free = r['free_coaching'] as bool;
+        _reason = r['free_reason'] as String?;
+      });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => GroupCard(margin: const EdgeInsets.only(top: 18), children: [
+        SwitchListTile(
+          secondary: const Icon(Icons.volunteer_activism_outlined),
+          title: const Text('Coached for free'),
+          subtitle: Text(_free ? (_reason ?? 'No fees expected') : 'Turn on for scholarships or players you don\'t charge'),
+          value: _free,
+          onChanged: _busy ? null : _set,
+        ),
+      ]);
+}
+
 class PlayerFeesCard extends StatelessWidget {
   const PlayerFeesCard({super.key, required this.playerId, required this.playerName});
   final String playerId;

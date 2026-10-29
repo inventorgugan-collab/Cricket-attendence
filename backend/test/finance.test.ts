@@ -62,7 +62,9 @@ describe('fees and money (admin only)', () => {
       expect(m.sessions.held).toBe(3);
       const a = m.coaches.find((c: any) => c.full_name === 'Coach Arun');
       expect(a).toMatchObject({ sessions: 2, earned_paise: 130000, paid_paise: 100000, owed_paise: 30000 });
-      expect(m.coaches.find((c: any) => c.full_name === 'Coach Bala')).toMatchObject({ sessions: 1, earned_paise: 40000 });
+      expect(m.coaches.find((c: any) => c.full_name === 'Coach Bala')).toMatchObject({ sessions: 1, earned_paise: 40000, hours: 1 });
+      expect(a.hours).toBe(2);
+      expect(m.sessions.hours).toBe(3);
     }
     expect(m.money).toMatchObject({
       received_paise: 900000,
@@ -72,6 +74,28 @@ describe('fees and money (admin only)', () => {
       profit_paise: 550000,
       outstanding_paise: 0,
     });
+  });
+
+  it('counts coaching given for free', async () => {
+    await w.admin.put(`/v1/players/${w.adult}/free-coaching`, { free: true, reason: 'Scholarship' });
+    expect(await w.admin.get(`/v1/players/${w.adult}`)).toMatchObject({ free_coaching: true, free_reason: 'Scholarship' });
+    // Parents and coaches don't see who is coached for free, and can't change it.
+    expect((await w.coachA.get(`/v1/players/${w.adult}`)).free_coaching).toBeUndefined();
+    expect((await w.coachA.raw('PUT', `/v1/players/${w.adult}/free-coaching`, { free: false })).status).toBe(403);
+
+    const s = await w.admin.post('/v1/sessions', { sessionType: 'one_on_one', coachIds: [w.coachBId], startsAt: past(2), endsAt: past(1), playerIds: [w.adult] });
+    await w.coachB.put(`/v1/sessions/${s.session.id}/attendance`, { records: [{ playerId: w.adult, status: 'present' }] });
+    const m = await w.admin.get(`/v1/finance/month?month=${thisMonth}`);
+    if (localDate(new Date(Date.now() - 2 * 3600_000)).startsWith(thisMonth)) {
+      expect(m.sessions.free).toMatchObject({ attendances: 1, sessions: 1, players: 1 });
+    }
+    await w.admin.put(`/v1/players/${w.adult}/free-coaching`, { free: false });
+  });
+
+  it('keeps rent as its own expense line', async () => {
+    await w.admin.post('/v1/expenses', { category: 'rent', description: 'October rent', amount: 15000, method: 'bank' });
+    const m = await w.admin.get(`/v1/finance/month?month=${thisMonth}`);
+    expect(m.money.expensesByCategory.find((e: any) => e.category === 'rent')).toMatchObject({ amount_paise: 1500000 });
   });
 
   it('is hidden from coaches, players and parents', async () => {

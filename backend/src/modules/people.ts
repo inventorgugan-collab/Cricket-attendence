@@ -75,6 +75,11 @@ export function presentPlayer(row: any, access: PlayerAccess) {
     base.registration_date = row.registration_date;
     base.has_account = !!row.user_id;
   }
+  // Whether the academy charges for this player is the admin's business only.
+  if (access === 'full') {
+    base.free_coaching = row.free_coaching;
+    base.free_reason = row.free_reason;
+  }
   return base;
 }
 

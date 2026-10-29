@@ -62,6 +62,7 @@ export async function monthSummary(db: Db, m: string) {
   const sessions = await one(
     db,
     `SELECT count(*)::int AS held,
+            coalesce(round(sum(extract(epoch FROM s.ends_at - s.starts_at)) / 3600.0, 1), 0)::float8 AS hours,
             count(*) FILTER (WHERE s.session_type = 'group')::int AS group_sessions,
             count(*) FILTER (WHERE s.session_type <> 'group')::int AS individual_sessions,
             (SELECT count(*) FROM attendance a JOIN sessions s2 ON s2.id = a.session_id
@@ -69,6 +70,20 @@ export async function monthSummary(db: Db, m: string) {
             (SELECT count(*) FROM sessions s WHERE s.status = 'cancelled'
               AND (s.starts_at AT TIME ZONE '${TZ}')::date >= $1::date AND (s.starts_at AT TIME ZONE '${TZ}')::date < $2::date)::int AS cancelled
        FROM sessions s WHERE ${held}`,
+    [start, next],
+  );
+  // Coaching given for free: attendances by free players, and sessions where
+  // everyone who turned up was coached for free.
+  const free = await one(
+    db,
+    `WITH came AS (
+       SELECT a.session_id, p.free_coaching FROM attendance a
+         JOIN players p ON p.id = a.player_id
+         JOIN sessions s ON s.id = a.session_id
+        WHERE a.status IN ('present', 'late') AND ${held})
+     SELECT (SELECT count(*) FROM came WHERE free_coaching)::int AS attendances,
+            (SELECT count(*) FROM (SELECT session_id FROM came GROUP BY session_id HAVING bool_and(free_coaching)) x)::int AS sessions,
+            (SELECT count(*) FROM players WHERE free_coaching AND status = 'active')::int AS players`,
     [start, next],
   );
   const byCategory = await many(
@@ -81,6 +96,7 @@ export async function monthSummary(db: Db, m: string) {
     db,
     `SELECT c.id, c.full_name,
             count(s.id)::int AS sessions,
+            coalesce(round(sum(extract(epoch FROM s.ends_at - s.starts_at)) / 3600.0, 1), 0)::float8 AS hours,
             coalesce(sum(coalesce(rc.amount_paise, rd.amount_paise, 0)) FILTER (WHERE s.id IS NOT NULL), 0)::bigint AS earned_paise,
             coalesce(bool_or(rc.amount_paise IS NULL AND rd.amount_paise IS NULL) FILTER (WHERE s.id IS NOT NULL), false) AS missing_rate,
             coalesce((SELECT sum(p.amount_paise) FROM coach_payouts p WHERE p.coach_id = c.id AND p.voided_at IS NULL AND p.for_month = $1::date), 0)::bigint AS paid_paise
@@ -127,7 +143,7 @@ export async function monthSummary(db: Db, m: string) {
   const expenses = n(money.expenses);
   return {
     month: m,
-    sessions: { ...sessions, byCategory },
+    sessions: { ...sessions, byCategory, free },
     coaches: coaches.map((c) => ({
       ...c,
       earned_paise: n(c.earned_paise),
@@ -168,6 +184,25 @@ export async function financeRoutes(app: FastifyInstance) {
     const rows = await many(pool, `${FEE_SELECT} WHERE ($1::uuid IS NULL OR f.player_id = $1) ORDER BY f.due_on DESC, f.created_at DESC LIMIT 500`, [q.playerId ?? null]);
     const fees = rows.map(presentFee);
     return q.open === 'true' ? fees.filter((f) => f.balance_paise > 0) : fees;
+  });
+
+  // Coaches a player for free: their sessions still count, no fees are expected.
+  app.put('/v1/players/:id/free-coaching', async (req) => {
+    const actor = actorOf(req);
+    adminOnly(actor);
+    const { id } = parse(idParams, req.params);
+    const body = parse(z.object({ free: z.boolean(), reason: z.string().trim().max(200).nullable().optional() }), req.body);
+    return tx(async (db) => {
+      const before = await one(db, `SELECT free_coaching, free_reason FROM players WHERE id = $1 FOR UPDATE`, [id]);
+      if (!before) throw notFound('Player');
+      const after = await one(
+        db,
+        `UPDATE players SET free_coaching = $2, free_reason = $3 WHERE id = $1 RETURNING free_coaching, free_reason`,
+        [id, body.free, body.free ? (body.reason ?? null) : null],
+      );
+      await audit(db, actor, 'player_free_coaching', 'player', id, before, after);
+      return after;
+    });
   });
 
   app.post('/v1/players/:id/fees', async (req) => {
@@ -337,7 +372,7 @@ export async function financeRoutes(app: FastifyInstance) {
     adminOnly(actor);
     const body = parse(
       z.object({
-        category: z.enum(['ground', 'equipment', 'travel', 'staff', 'utilities', 'other']),
+        category: z.enum(['rent', 'ground', 'equipment', 'travel', 'staff', 'utilities', 'other']),
         description: z.string().trim().min(2).max(200),
         amount: rupees,
         spentOn: isoDate.default(() => localDate()),

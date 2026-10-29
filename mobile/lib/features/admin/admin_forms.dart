@@ -142,6 +142,7 @@ class AdminPlayerScreen extends StatelessWidget {
                 if (added == true) await reload();
               },
             ),
+            FreeCoachingTile(playerId: playerId, free: p['free_coaching'] == true, reason: p['free_reason'] as String?),
             // A new key after each reload so a new package's fee shows up.
             PlayerFeesCard(key: ValueKey(packages.length), playerId: playerId, playerName: p['full_name'] as String),
           ]);
